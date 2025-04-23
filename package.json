@@ -10,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mysten/enoki": "^0.6.6",
+    "@mysten/sui": "^1.28.1",
+    "@mysten/wallet-adapter-react": "^11.0.0",
+    "@mysten/wallet-standard": "^0.14.6",
     "@tailwindcss/vite": "^4.1.4",
     "lucide-react": "^0.503.0",
     "react": "^19.0.0",

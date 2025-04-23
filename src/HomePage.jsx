@@ -1,60 +1,68 @@
-import { useState } from 'react';
-import { Search, Plus, ChevronRight } from 'lucide-react';
-
+import { useState, useEffect, use } from 'react';
+import { Search, Plus, ChevronRight, User, LogOut } from 'lucide-react';
+import { useLogin } from './UserContext';
+import TransferSUI from './TransferSUI';
+import { SuiClient } from "@mysten/sui/client";
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showWalletInfo, setShowWalletInfo] = useState(false);
+  const [userBalance, setUserBalance] = useState(0);
+  const { isLoggedIn, login, logout, userDetails } = useLogin();
+  const FULLNODE_URL = "https://fullnode.testnet.sui.io"; // Sui fullnode URL
+  const NETWORK = "testnet"; // or "mainnet" for production
   
   // Sample featured games data
+  const getBalance = async (walletAddress) => {
+      const suiClient = new SuiClient({ url: FULLNODE_URL });
+      const balanceObj = await suiClient.getCoins({
+        owner: walletAddress,
+        limit: 100,
+      });
+  
+      const balance = balanceObj.data
+        .filter((coinObj) => coinObj.coinType === "0x2::sui::SUI")
+        .reduce((acc, obj) => acc + parseInt(obj.balance), 0);
+      setUserBalance(balance * 10 ** -9);
+    };
+    
   const featuredGames = [
-    {
-      id: 1,
-      title: "Cosmic Defenders",
-      creator: "@space_game_dev",
-      thumbnail: "/1.png"
-    },
-    {
-      id: 2,
-      title: "Pixel Survivors",
-      creator: "@retro_gamer",
-      thumbnail: "/2.png"
-    },
-    {
-      id: 3,
-      title: "Blockchain Battles",
-      creator: "@crypto_creator",
-      thumbnail: "/3.png"
-    },
-    {
-      id: 4,
-      title: "NFT Racers",
-      creator: "@digital_speedster",
-      thumbnail: "/4.png"
-    },
-    {
-      id: 5,
-      title: "Fantasy Quest",
-      creator: "@fantasy_dev",
-      thumbnail: "/5.png"
-    },
-    {
-      id: 6,
-      title: "Mystic Realms",
-      creator: "@mystic_dev",
-      thumbnail: "/6.png"
-    },
-    {
-      id: 7,
-      title: "Adventure Awaits",
-      creator: "@adventure_dev",
-      thumbnail: "/7.png"
-    },
-    {
-      id: 8,
-      title: "Epic Battles",
-      creator: "@epic_dev",
-      thumbnail: "/8.png"
-    }
+    { id: 1, title: "Cosmic Defenders", creator: "@space_game_dev", thumbnail: "/1.png" },
+    { id: 2, title: "Pixel Survivors", creator: "@retro_gamer", thumbnail: "/2.png" },
+    { id: 3, title: "Blockchain Battles", creator: "@crypto_creator", thumbnail: "/3.png" },
+    { id: 4, title: "NFT Racers", creator: "@digital_speedster", thumbnail: "/4.png" },
+    { id: 5, title: "Fantasy Quest", creator: "@fantasy_dev", thumbnail: "/5.png" },
+    { id: 6, title: "Mystic Realms", creator: "@mystic_dev", thumbnail: "/6.png" },
+    { id: 7, title: "Adventure Awaits", creator: "@adventure_dev", thumbnail: "/7.png" },
+    { id: 8, title: "Epic Battles", creator: "@epic_dev", thumbnail: "/8.png" }
   ];
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      // Do something when logged in (optional)
+    }
+  }, [isLoggedIn]);
+  useEffect(() => {
+    if (userDetails) {
+      getBalance(userDetails.address);
+    }
+  }, [userDetails]);
+
+  // Function to toggle wallet info popup
+  const toggleWalletInfo = () => {
+    setShowWalletInfo(!showWalletInfo);
+  };
+
+  // Function to handle logout and close popup
+  const handleLogout = () => {
+    logout();
+    setShowWalletInfo(false);
+  };
+
+  // Function to format wallet address
+  const formatAddress = (address) => {
+    if (!address) return '';
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -63,9 +71,42 @@ export default function HomePage() {
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">SuiPlayground</h1>
           <div className="flex space-x-4">
-            <button className="px-4 py-2 bg-sky-500 rounded-md hover:bg-purple-600 transition">
-              Connect Wallet
-            </button>
+            {isLoggedIn ? (
+              <div className="relative">
+                <button 
+                  onClick={toggleWalletInfo}
+                  className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center hover:bg-sky-600 transition"
+                >
+                  <User size={20} />
+                </button>
+                
+                {showWalletInfo && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white text-gray-800 rounded-lg shadow-lg p-4 z-10">
+                    <div className="mb-3">
+                      <h3 className="font-bold text-gray-700">Wallet Address</h3>
+                      <p className="text-sm break-all">{userDetails.address}</p>
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="font-bold text-gray-700">Balance</h3>
+                      <p className="text-lg font-semibold">{userBalance || '0'} SUI</p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition flex items-center justify-center"
+                    >
+                      <LogOut size={16} className="mr-2" /> Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={login}
+                className="px-4 py-2 bg-sky-500 rounded-md hover:bg-purple-600 transition"
+              >
+                Connect Wallet
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -94,10 +135,14 @@ export default function HomePage() {
           <h2 className="text-2xl font-bold mb-4">Featured Games</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredGames.map(game => (
-              <div onClick={() => window.location.href = "/game/"+game.id} key={game.id}  className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition cursor-pointer">
-                <img 
-                  src={game.thumbnail} 
-                  alt={game.title} 
+              <div
+                onClick={() => window.location.href = "/game/" + game.id}
+                key={game.id}
+                className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition cursor-pointer"
+              >
+                <img
+                  src={game.thumbnail}
+                  alt={game.title}
                   className="w-full h-40 object-cover"
                 />
                 <div className="p-4">
@@ -139,7 +184,7 @@ export default function HomePage() {
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center">
             <h3 className="text-xl font-bold mb-4">Turn your ideas into blockchain games</h3>
             <p className="mb-6">AI generates code, art & logic. Mint directly to Sui blockchain.</p>
-            <button 
+            <button
               className="px-8 py-4 bg-white text-purple-700 font-bold rounded-lg hover:bg-purple-100 transition text-lg"
               onClick={() => window.location.href = "/create"}
             >
