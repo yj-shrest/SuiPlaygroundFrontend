@@ -1,15 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Send, Save, ArrowLeft, AlertCircle } from 'lucide-react';
+import { useEnokiFlow } from "@mysten/enoki/react";
+import { useLogin } from "./UserContext"; 
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions";
+import { bcs } from '@mysten/sui/bcs';
+
+const NETWORK = "testnet"; 
+const FULLNODE_URL = getFullnodeUrl(NETWORK);
+const AI_GAME_GENERATOR_PACKAGE_ID = "0x2ef798a02023d27e258ebeba18db93aaef4d193e82c3f7f3a8013e8018083d2c";
+const GAME_BOOK_OBJECT_ID = "0x789a6d929373f6dfac6750b5258605e0315e3dec896e2d4d758823be65168541"; 
+const DEFAULT_GAME_PROMPT = "My Awesome Game Idea"; 
 
 export default function Create() {
   const [prompt, setPrompt] = useState('');
   const [gameConfig, setGameConfig] = useState(null);
   const [gameHtml, setGameHtml] = useState(null);
+  const [blobId, setBlobId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [feedbackPrompt, setFeedbackPrompt] = useState('');
   const [error, setError] = useState(null);
-  
-  // Function to handle initial prompt submission
+  const flow = useEnokiFlow();
+  const { userDetails } = useLogin(); 
+  const [txnDigest, setTxnDigest] = useState(); 
+
   const handlePromptSubmit = async () => {
     if (!prompt.trim()) return;
     
@@ -23,7 +37,7 @@ export default function Create() {
              body: JSON.stringify({ prompt: prompt }),
       });
       if (response.ok) {
-        const data = await response.json(); // 👈 parse JSON response
+        const data = await response.json();
         console.log(data);
         setGameConfig(data);
         setLoading(false);
@@ -38,7 +52,6 @@ export default function Create() {
     }
   };
   
-  // Function to handle edited configuration submission
   const handleConfigSubmit = async () => {
     if (!gameConfig) return;
     
@@ -52,9 +65,9 @@ export default function Create() {
         body: JSON.stringify({ gameConfig: gameConfig }),
       });
         if (response.ok) {
-            const data = await response.json(); // 👈 parse JSON response
+            const data = await response.json(); 
             console.log(data);
-            setGameHtml(data.html); // Assuming the backend returns the HTML as 'html'
+            setGameHtml(data.html); 
             setLoading(false);
         } else {
             const errorText = await response.text();
@@ -67,7 +80,6 @@ export default function Create() {
     }
   };
   
-  // Function to handle game feedback/update
   const handleFeedbackSubmit = async () => {
     if (!feedbackPrompt.trim()) return;
     
@@ -81,9 +93,9 @@ export default function Create() {
         body: JSON.stringify({ feedbackPrompt: feedbackPrompt, gameHtml: gameHtml }),
       });
       if (response.ok) {
-        const data = await response.json(); // 👈 parse JSON response
+        const data = await response.json();
         console.log(data);
-        setGameHtml(data.html); // Assuming the backend returns the updated HTML as 'html'
+        setGameHtml(data.html); 
         setLoading(false);
       } else {
         const errorText = await response.text();
@@ -95,13 +107,115 @@ export default function Create() {
       setLoading(false);
     }
   };
-  
-  // Function to handle game minting
-  const handleMint = () => {
-    alert("Minting process would start here. This will require some SUI tokens as fees.");
+
+  const store_blob = async () => {
+    if (!gameHtml) return;
+
+    try {
+      const response = await fetch('http://127.0.1:5000/store_blob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameHtml: gameHtml }),
+      });
+      if (response.ok) {
+        const data = await response.json(); 
+        console.log(data);
+        setBlobId(data.blobId); 
+      }
+      else {
+        const errorText = await response.text();
+        console.error("Backend error:", errorText);
+      }
+    } catch (err) {
+      setError("Failed to get blob. Please try again.");
+    }
+  };
+
+  const handleMint = async () => {
+    try {
+      await store_blob(); 
+      console.log("Blob ID:", blobId); 
+      await handleCreateGame();
+    }
+    catch (err) {
+      setError("Failed to mint game. Please try again.");
+      console.error("Error:", err);
+    }
   };
   
-  // Function to update a specific game config value
+  const handleCreateGame = async () => {
+    if (!userDetails) {
+         setError("Please log in first.");
+         return;
+    }
+    if (!flow) {
+        setError("Enoki Flow not available.");
+        return;
+    }
+
+    setLoading(true);
+    setTxnDigest(null); 
+    setError(null); 
+
+    try {
+        console.log(`Using network: ${NETWORK} (${FULLNODE_URL})`);
+        const suiClient = new SuiClient({ url: FULLNODE_URL });
+        if (!flow) throw new Error("Enoki flow is not initialized.");
+        const keypair = await flow.getKeypair({ network: NETWORK });
+
+        console.log("User Address:", keypair.getPublicKey().toSuiAddress());
+        console.log("GameBook Object ID:", GAME_BOOK_OBJECT_ID);
+        console.log("Package ID:", AI_GAME_GENERATOR_PACKAGE_ID);
+
+        const txb = new Transaction();
+
+        const gamePromptBytes = new TextEncoder().encode(blobId);
+
+        txb.moveCall({
+            target: `${AI_GAME_GENERATOR_PACKAGE_ID}::ai_game_generator::create_game`,
+            arguments: [
+                txb.object(GAME_BOOK_OBJECT_ID),       
+                txb.pure(gamePromptBytes, 'vector<u8>'),    
+                txb.pure(bcs.option(bcs.u64()).serialize(null), 'Option<u64>')
+            ],
+        });
+
+        console.log("Transaction block prepared. Signing and executing...");
+
+        const txnRes = await suiClient.signAndExecuteTransaction({
+            signer: keypair,
+            transaction: txb,
+            options: {
+                showEffects: true,
+            }
+        });
+
+        console.log("Transaction Response:", txnRes);
+
+        if (txnRes?.digest) {
+            console.log("Game creation successful. Digest:", txnRes.digest);
+            setTxnDigest(txnRes.digest);
+        } else {
+             throw new Error("Transaction failed or digest not found in response.");
+        }
+
+    } catch (err) {
+        console.error("Error creating game:", err);
+        const errorMessage = err instanceof Error ? err.message : String(err) ?? "An unknown error occurred.";
+        if (errorMessage.includes("tx.pure must be called either a bcs type name, or a serialized bcs value")) {
+            setError(`Failed to create game: Issue with serializing arguments for the smart contract. Please check how Option<u64> is passed. Details: ${errorMessage}`);
+        } else if (errorMessage.includes("RPC error")) {
+             setError(`RPC Error: Could not connect to ${NETWORK} node or issue with the request. Details: ${errorMessage}`);
+        } else if (errorMessage.includes("InsufficientGas")) {
+             setError("Transaction failed: Insufficient gas. Please ensure the account has enough SUI.");
+        } else {
+             setError(`Failed to create game: ${errorMessage}`);
+        }
+    } finally {
+        setLoading(false);
+    }
+  };
+  
   const updateConfigValue = (key, value) => {
     setGameConfig({
       ...gameConfig,
@@ -111,7 +225,6 @@ export default function Create() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      {/* Header */}
       <header className="bg-gray-800 text-white p-4">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
@@ -126,7 +239,6 @@ export default function Create() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto p-4 flex-1">
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
@@ -135,7 +247,6 @@ export default function Create() {
           </div>
         )}
         
-        {/* Step 1: Initial Prompt */}
         {!gameConfig && !gameHtml && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-xl font-bold mb-4">Describe Your Game</h2>
@@ -169,7 +280,6 @@ export default function Create() {
           </div>
         )}
         
-        {/* Step 2: Edit Configuration */}
         {gameConfig && !gameHtml && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-xl font-bold mb-4">Customize Your Game</h2>
@@ -218,7 +328,6 @@ export default function Create() {
           </div>
         )}
         
-        {/* Step 3: Game Preview and Feedback */}
         {gameHtml && (
           <>
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -232,7 +341,6 @@ export default function Create() {
                 sandbox="allow-scripts allow-same-origin"
                 allow="autoplay"
                 onLoad={() => {
-                    // Optional: Auto-focus the iframe when it loads
                     document.querySelector('iframe').focus();
                 }}
                 />

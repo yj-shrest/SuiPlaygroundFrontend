@@ -8,10 +8,9 @@ export default function HomePage() {
   const [showWalletInfo, setShowWalletInfo] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
   const { isLoggedIn, login, logout, userDetails } = useLogin();
-  const FULLNODE_URL = "https://fullnode.testnet.sui.io"; // Sui fullnode URL
-  const NETWORK = "testnet"; // or "mainnet" for production
+  const FULLNODE_URL = "https://fullnode.testnet.sui.io"; 
+  const NETWORK = "testnet"; 
   
-  // Sample featured games data
   const getBalance = async (walletAddress) => {
       const suiClient = new SuiClient({ url: FULLNODE_URL });
       const balanceObj = await suiClient.getCoins({
@@ -37,28 +36,20 @@ export default function HomePage() {
   ];
 
   useEffect(() => {
-    if (isLoggedIn) {
-      // Do something when logged in (optional)
-    }
-  }, [isLoggedIn]);
-  useEffect(() => {
     if (userDetails) {
       getBalance(userDetails.address);
     }
   }, [userDetails]);
 
-  // Function to toggle wallet info popup
   const toggleWalletInfo = () => {
     setShowWalletInfo(!showWalletInfo);
   };
 
-  // Function to handle logout and close popup
   const handleLogout = () => {
     logout();
     setShowWalletInfo(false);
   };
 
-  // Function to format wallet address
   const formatAddress = (address) => {
     if (!address) return '';
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -111,9 +102,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto p-4 flex-1">
-        {/* Search and Create Section */}
         <div className="flex justify-between items-center mb-8">
           <div className="relative flex-1 max-w-lg">
             <input
@@ -130,7 +119,6 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Featured Games */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4">Featured Games</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -154,7 +142,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Create Your Own Game Section */}
         <section className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8 text-white">
           <h2 className="text-2xl font-bold mb-6">Create Your Own Game</h2>
           

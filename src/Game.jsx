@@ -11,7 +11,6 @@ export default function GamePage() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    // Fetch game data when component mounts or gameId changes
     const fetchGame = async () => {
       setLoading(true);
       setError(null);
@@ -24,7 +23,7 @@ export default function GamePage() {
         const data = await response.json();
         
         setGame(data.game);
-        setGameHtml(data.game); // Assuming the API returns HTML for the game
+        setGameHtml(data.game); 
         setLoading(false);
         
       } catch (err) {
@@ -37,7 +36,6 @@ export default function GamePage() {
   }, [gameId]);
 
   const handleRemix = () => {
-    // In a real app, this would redirect to the remix page with the game template
     alert(`Remixing Game #${gameId}... This would take you to the create page with this game as a template.`);
   };
 
@@ -101,7 +99,6 @@ export default function GamePage() {
                 </div>
               </div>
               
-              {/* Game Display */}
               {isPlaying ? (
                 <div className="border border-gray-300 rounded-lg overflow-hidden bg-black">
                   <iframe
