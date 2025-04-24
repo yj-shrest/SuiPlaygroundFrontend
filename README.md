@@ -1,4 +1,4 @@
-# 🎮 AI Game Generator Frontend
+# 🎮 SUI Playground Frontend
 
 This is the **React.js frontend** for the AI Game Generator project — a platform where users can **generate**, **play**, **update**, and **remix** HTML5 mini-games using natural language prompts.
 
