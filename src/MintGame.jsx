@@ -5,15 +5,14 @@ import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from '@mysten/sui/bcs';
 
-// Base64 utils are imported but not used in this snippet, kept in case needed elsewhere
-// import { fromBase64, toBase64 } from "@mysten/sui/utils";
-
 // --- Configuration Constants ---
 const NETWORK = "testnet"; // Or "mainnet", "devnet"
 const FULLNODE_URL = getFullnodeUrl(NETWORK);
-const AI_GAME_GENERATOR_PACKAGE_ID = "0x2ef798a02023d27e258ebeba18db93aaef4d193e82c3f7f3a8013e8018083d2c";
-const GAME_BOOK_OBJECT_ID = "0x4af8e47294b15c2e77218f981474e22d0ffec3fe9074d43f92564e6e2c65a877"; // Ensure this is correct for the chosen NETWORK
+const AI_GAME_GENERATOR_PACKAGE_ID = "0xa321a43ec3eaccc412337b474f627a6e9bd5eee2df4fba4b1f7b281c1f9317ea";
+const GAME_BOOK_OBJECT_ID = "0xa63e89b692e4dd37e3ed2a9cb574d6194e2fbb9409161a6a7afbc01c0fe540b2";
 const DEFAULT_GAME_PROMPT = "My Awesome Game Idea"; // Example prompt
+const CURRENT_DATE = "2025-04-24 09:39:29";
+const CURRENT_USER = "Rishikesh0523";
 
 // --- Component ---
 const MintGame = () => {
@@ -21,91 +20,86 @@ const MintGame = () => {
     const { userDetails } = useLogin(); // Get user details from context
     const [txnDigest, setTxnDigest] = useState(); // Store the transaction digest
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState (); // Store potential errors
+    const [error, setError] = useState(); // Store potential errors
 
-        // Function to handle game creation
-        const handleCreateGame = async () => {
-            if (!userDetails) {
-                 setError("Please log in first.");
-                 return;
+    const handleCreateGame = async () => {
+        if (!userDetails) {
+            setError("Please log in first.");
+            return;
+        }
+        if (!flow) {
+            setError("Enoki Flow not available.");
+            return;
+        }
+
+        setLoading(true);
+        setTxnDigest(null);
+        setError(null);
+
+        try {
+            console.log(`Using network: ${NETWORK} (${FULLNODE_URL})`);
+            const suiClient = new SuiClient({ url: FULLNODE_URL });
+            const keypair = await flow.getKeypair({ network: NETWORK });
+
+            console.log("User Address:", keypair.getPublicKey().toSuiAddress());
+            console.log("GameBook Object ID:", GAME_BOOK_OBJECT_ID);
+            console.log("Package ID:", AI_GAME_GENERATOR_PACKAGE_ID);
+
+            const txb = new Transaction();
+
+            // Define the game prompt
+            const gamePrompt = DEFAULT_GAME_PROMPT;
+
+            // Convert string to Uint8Array using TextEncoder
+            const promptBytes = new TextEncoder().encode(gamePrompt);
+
+            // Encode as vector<u8> using BCS
+            const gamePromptBytes = bcs.vector(bcs.u8()).serialize(Array.from(promptBytes)).toBytes();
+
+            // Serialize 0 as u64 using BCS (you can also pass a bigint like `0n`)
+            const zeroU64 = bcs.U64.serialize(0).toBytes();
+            txb.setSender(keypair.getPublicKey().toSuiAddress());
+
+            // Now pass it to `txb.pure` WITHOUT a type string
+            txb.moveCall({
+                target: `${AI_GAME_GENERATOR_PACKAGE_ID}::ai_game_generator::create_game_shared`,
+                arguments: [
+                    txb.object(GAME_BOOK_OBJECT_ID),
+                    txb.pure(gamePromptBytes),         // <- already serialized with bcs
+                    txb.pure(zeroU64)                  // <- this too!
+                ],
+                typeArguments: [],
+            });
+
+            console.log("Transaction block prepared. Signing and executing...");
+
+            const builtTx = await txb.build({ client: suiClient });
+
+            const txnRes = await suiClient.signAndExecuteTransaction({
+                signer: keypair,
+                transaction: builtTx,  // ✅ This is a Uint8Array
+                options: {
+                    showEffects: true,
+                },
+            });
+
+            console.log("Transaction Response:", txnRes);
+
+            if (txnRes?.digest) {
+                console.log("Game creation successful. Digest:", txnRes.digest);
+                setTxnDigest(txnRes.digest);
+            } else {
+                throw new Error("Transaction failed or digest not found in response.");
             }
-            if (!flow) {
-                setError("Enoki Flow not available.");
-                return;
-            }
-    
-            setLoading(true);
-            setTxnDigest(null); // Reset previous digest
-            setError(null); // Reset previous error
-    
-            try {
-                console.log(`Using network: ${NETWORK} (${FULLNODE_URL})`);
-                const suiClient = new SuiClient({ url: FULLNODE_URL });
-                // Ensure flow is available before calling getKeypair
-                if (!flow) throw new Error("Enoki flow is not initialized.");
-                const keypair = await flow.getKeypair({ network: NETWORK });
-    
-                console.log("User Address:", keypair.getPublicKey().toSuiAddress());
-                console.log("GameBook Object ID:", GAME_BOOK_OBJECT_ID);
-                console.log("Package ID:", AI_GAME_GENERATOR_PACKAGE_ID);
-    
-                const txb = new Transaction();
-    
-                // Define the arguments for the move call
-                const gamePromptBytes = new TextEncoder().encode(DEFAULT_GAME_PROMPT);
-                // const optionNoneU64 = { None: true }; // REMOVED - This is not serializable by pure
-    
-                
-                txb.moveCall({
-                    target: `${AI_GAME_GENERATOR_PACKAGE_ID}::ai_game_generator::create_game`,
-                    arguments: [
-                        txb.object(GAME_BOOK_OBJECT_ID),
-                        txb.pure(gamePromptBytes),
-                        // Use a proper BCS-encoded Option<u64>
-                        // For None, we specify the option type and serialize null
-                        txb.pure(bcs.option(bcs.u64()).serialize(null))
-                    ],
-                });
-    
-                console.log("Transaction block prepared. Signing and executing...");
-    
-                // Sign and execute the transaction
-                const txnRes = await suiClient.signAndExecuteTransaction({
-                    signer: keypair,
-                    transaction: txb,
-                    options: {
-                        showEffects: true,
-                        gasBudget: 100000000,
-                    }
-                });
-    
-                console.log("Transaction Response:", txnRes);
-    
-                // Check for successful execution and digest
-                if (txnRes?.digest) {
-                    console.log("Game creation successful. Digest:", txnRes.digest);
-                    setTxnDigest(txnRes.digest);
-                } else {
-                     throw new Error("Transaction failed or digest not found in response.");
-                }
-    
-            } catch (err) {
-                console.error("Error creating game:", err);
-                const errorMessage = err instanceof Error ? err.message : String(err) ?? "An unknown error occurred.";
-                // Check if the error message is the one we are fixing
-                if (errorMessage.includes("tx.pure must be called either a bcs type name, or a serialized bcs value")) {
-                    setError(`Failed to create game: Issue with serializing arguments for the smart contract. Please check how Option<u64> is passed. Details: ${errorMessage}`);
-                } else if (errorMessage.includes("RPC error")) {
-                     setError(`RPC Error: Could not connect to ${NETWORK} node or issue with the request. Details: ${errorMessage}`);
-                } else if (errorMessage.includes("InsufficientGas")) {
-                     setError("Transaction failed: Insufficient gas. Please ensure the account has enough SUI.");
-                } else {
-                     setError(`Failed to create game: ${errorMessage}`);
-                }
-            } finally {
-                setLoading(false);
-            }
-        };
+
+        } catch (err) {
+            console.error("Error creating game:", err);
+            const errorMessage = err instanceof Error ? err.message : String(err) ?? "An unknown error occurred.";
+            setError(`Failed to create game: ${errorMessage}`);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Basic inline styles for demonstration (can be moved to CSS/Styled Components)
     const styles = {
@@ -139,7 +133,7 @@ const MintGame = () => {
             marginTop: '10px',
             wordBreak: 'break-word',
         },
-         info: {
+        info: {
             color: '#666',
             marginTop: '10px',
             fontSize: '14px',
@@ -148,8 +142,12 @@ const MintGame = () => {
             color: '#007bff',
             textDecoration: 'none',
         },
+        footer: {
+            marginTop: '20px',
+            fontSize: '12px',
+            color: '#888',
+        }
     };
-
 
     return (
         <div className="mint-game-container" style={styles.container}>
@@ -165,7 +163,7 @@ const MintGame = () => {
                     Game Created Successfully! <br />
                     Transaction Digest:{" "}
                     <a
-                        href={`https://suiscan.xyz/${NETWORK}/tx/${txnDigest}`} // Updated explorer URL
+                        href={`https://suiscan.xyz/${NETWORK}/tx/${txnDigest}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={styles.link}
@@ -178,7 +176,7 @@ const MintGame = () => {
             {/* Action Button */}
             <button
                 onClick={handleCreateGame}
-                disabled={loading || !userDetails || !flow} // Also disable if flow isn't ready
+                disabled={loading || !userDetails || !flow}
                 style={styles.button(loading || !userDetails || !flow)}
                 title={!userDetails ? "Please log in to create a game" : !flow ? "Enoki flow not ready" : ""}
             >
@@ -187,6 +185,11 @@ const MintGame = () => {
 
             {/* Inform user if they need to log in */}
             {!userDetails && <p style={styles.info}>Please log in to enable game creation.</p>}
+
+            {/* Footer with user and date information */}
+            <div style={styles.footer}>
+                User: {CURRENT_USER} | Last updated: {CURRENT_DATE}
+            </div>
         </div>
     );
 }
