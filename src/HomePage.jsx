@@ -1,16 +1,101 @@
 import { useState, useEffect, use } from 'react';
 import { Search, Plus, ChevronRight, User, LogOut } from 'lucide-react';
 import { useLogin } from './UserContext';
-import TransferSUI from './TransferSUI';
-import { SuiClient } from "@mysten/sui/client";
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+
+const NETWORK = "testnet";
+const FULLNODE_URL = getFullnodeUrl(NETWORK);
+const objectId =
+  "0x6beae9325f296d0978e0d26c2277f204923e8e83472e3f60b713b8e334e942e2";
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showWalletInfo, setShowWalletInfo] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [images, setImages] = useState([]);
   const { isLoggedIn, login, logout, userDetails } = useLogin();
   const FULLNODE_URL = "https://fullnode.testnet.sui.io"; 
   const NETWORK = "testnet"; 
   
+  useEffect(() => {
+      const fetch = async () => {
+        const suiClient = new SuiClient({ url: FULLNODE_URL });
+        const packageId =
+          "0x7b1f0507ef23d66e600f77e8209f52a864e117719ac017604ee8327a2d3c55e9";
+  
+        const obj = await suiClient.getObject({
+          id: objectId,
+          options: { showContent: true },
+        });
+  
+        const fields = obj.data?.content?.fields;
+        console.log("Game ID Counter:", fields.id_counter);
+        const owners = fields.game_ids;
+        console.log("Owners:", owners);
+  
+        //get unique owners
+        const uniqueOwners = [...new Set(owners)];
+  
+        // fetch gameobjects using unique owners
+        const gameObjectsdata = await Promise.all(
+          uniqueOwners.map(async (owner) => {
+            const gameObj = await suiClient.getOwnedObjects({
+              owner: owner,
+              options: { showContent: true, showType: true },
+            });
+            return gameObj.data;
+          })
+        );
+        console.log("Game Object:", gameObjectsdata);
+        //filter the game objects to get the ones that are created by the packageId
+        console.log(gameObjectsdata.flat());
+        const filteredGameObj = gameObjectsdata.flat().filter((obj) => {
+          return obj.data?.type === `${packageId}::ai_game_generator::Game`
+        });
+        console.log("Filtered Game Object:", filteredGameObj);
+        //fetch game objects using filteredGameObj data.objectId
+        const gameObjects = await Promise.all(
+          filteredGameObj.map(async (obj) => {
+            const gameObj = await suiClient.getObject({
+              id: obj.data.objectId,
+              options: { showContent: true },
+            });
+            return gameObj.data.content.fields;
+          })
+        );
+        const filteredGames = gameObjects.filter((game) => {
+          return game.image_blob_id.length > 20 && game.game_id >1;});
+        console.log(filteredGames);
+        localStorage.setItem("games", JSON.stringify(filteredGames));
+        setGames(filteredGames);
+      };
+  
+      fetch();
+    }, []);
+  
+    useEffect(() => {
+      const loadAllImages = async () => {
+          const newImages = {};
+          for (let i = 0; i < games.length; i++) {
+              const game = games[i];
+              const decoder = new TextDecoder();
+              const image_blob_id_decoded = decoder.decode(new Uint8Array(game.image_blob_id));
+              const res = await fetch(`http://127.0.0.1:5000/get_image/${image_blob_id_decoded}`);
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              newImages[i] = url;
+          }
+          setImages(newImages);
+          setLoading(false);
+      };
+  
+      if (games.length > 0) {
+          loadAllImages();
+      }
+  }, [games]);
+
+
   const getBalance = async (walletAddress) => {
       const suiClient = new SuiClient({ url: FULLNODE_URL });
       const balanceObj = await suiClient.getCoins({
@@ -121,24 +206,26 @@ export default function HomePage() {
 
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4">Featured Games</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredGames.map(game => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+            {games.length>0 && (games.map((game, index) => (
               <div
-                onClick={() => window.location.href = "/game/" + game.id}
-                key={game.id}
+                onClick={() => window.location.href = "/game/" + game.game_id}
+                key={game.game_id}
                 className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition cursor-pointer"
               >
+                {images[index] && (
                 <img
-                  src={game.thumbnail}
-                  alt={game.title}
-                  className="w-full h-40 object-cover"
+                  src={images[index]}
+                  alt="Game Thumbnail"
+                  className="w-full h-50 object-cover"
                 />
+              )}
                 <div className="p-4">
                   <h3 className="font-bold text-lg mb-1">{game.title}</h3>
-                  <p className="text-gray-600">{game.creator}</p>
+                  <p className="text-gray-600">{game.creator_name}</p>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </section>
 

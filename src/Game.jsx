@@ -5,6 +5,10 @@ import { ArrowLeft, Play, Repeat, Loader } from 'lucide-react';
 export default function GamePage() {
   const { gameId } = useParams();
   const [game, setGame] = useState(null);
+  const [games, setGames] = useState(() => {
+    const saved = localStorage.getItem("games");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [gameHtml, setGameHtml] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,14 +20,21 @@ export default function GamePage() {
       setError(null);
       
       try {
-        const response = await fetch(`http://127.0.0.1:5000/get_game/${gameId}`);
+        //extract blobid from gameId from games array
+        console.log(games)
+        const gameData = games.find((game) => game.game_id === gameId);
+        setGame(gameData);
+        console.log("Game Data:", gameData);
+        const blobId = gameData?.blob_id;
+        const decoder = new TextDecoder();
+        const blob_id_decoded = decoder.decode(new Uint8Array(blobId));
+        const response = await fetch(`http://127.0.0.1:5000/get_blob/${blob_id_decoded}`);
         if (!response.ok) {
           throw new Error("Game not found");
         }
-        const data = await response.json();
-        
-        setGame(data.game);
-        setGameHtml(data.game); 
+        const data = await response.text();
+        console.log(data)
+        setGameHtml(data); 
         setLoading(false);
         
       } catch (err) {
@@ -76,7 +87,7 @@ export default function GamePage() {
                   <h1 className="text-3xl font-bold mb-2">{game.title}</h1>
                   <p className="text-gray-600">{game.description}</p>
                   <div className="mt-2 text-sm text-gray-500">
-                    Created by {game.creator} • {game.createdAt}
+                    Created by {game.creator_name}
                   </div>
                 </div>
                 
@@ -99,7 +110,7 @@ export default function GamePage() {
                 </div>
               </div>
               
-              {isPlaying ? (
+              {isPlaying && gameHtml ?  (
                 <div className="border border-gray-300 rounded-lg overflow-hidden bg-black">
                   <iframe
                     srcDoc={gameHtml}
@@ -109,7 +120,7 @@ export default function GamePage() {
                     allow="autoplay"
                   />
                   <div className="bg-gray-800 text-white p-4 text-center">
-                    <p>Click inside the game to activate controls. Use WASD to move and Space to jump.</p>
+                    <p>Click inside the game to activate controls.</p>
                   </div>
                 </div>
               ) : (
