@@ -5,6 +5,7 @@ import { useLogin } from "./UserContext";
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
+import { Search, Plus, ChevronRight, User, LogOut } from 'lucide-react';
 
 const NETWORK = "testnet";
 const FULLNODE_URL = getFullnodeUrl(NETWORK);
@@ -15,21 +16,26 @@ const GAME_BOOK_OBJECT_ID =
 const DEFAULT_GAME_PROMPT = "My Awesome Game Idea";
 
 export default function Create() {
+  const [showWalletInfo, setShowWalletInfo] = useState(false);
+  const [userBalance, setUserBalance] = useState(0);
+
   const [prompt, setPrompt] = useState("");
   const [gameConfig, setGameConfig] = useState(null);
   const [gameHtml, setGameHtml] = useState(null);
   const [blobId, setBlobId] = useState(null);
   const [imageBlobId, setImageBlobId] = useState(null);
-  const [creatorName, setCreatorName] = useState("Rishikesh0523");
+  const [creatorName, setCreatorName] = useState("");
   const [title, setTitle] = useState("My Awesome Game");
   const [parent, setParent] = useState(0); 
   const [price, setPrice] = useState(0);
   const [loading, setLoading] = useState(false);
   const [feedbackPrompt, setFeedbackPrompt] = useState("");
   const [error, setError] = useState(null);
+  const [showMintForm, setShowMintForm] = useState(false);
   const flow = useEnokiFlow();
-  const { userDetails } = useLogin();
   const [txnDigest, setTxnDigest] = useState();
+  const { isLoggedIn, login, logout, userDetails } = useLogin();
+
 
   const handlePromptSubmit = async () => {
     if (!prompt.trim()) return;
@@ -130,25 +136,67 @@ export default function Create() {
         console.log(data);
         setBlobId(data.blob_id);
         setImageBlobId(data.image_blob_id);
+        return data; // Return the data so we can use it directly
       } else {
         const errorText = await response.text();
         console.error("Backend error:", errorText);
+        throw new Error(errorText);
       }
     } catch (err) {
       setError("Failed to get blob. Please try again.");
+      throw err;
     }
   };
 
+  const handleShowMintForm = () => {
+    setShowMintForm(true);
+  };
+
   const handleMint = async () => {
+    if (!creatorName.trim()) {
+      setError("Creator name is required.");
+      return;
+    }
+
     try {
-      await store_blob();
-      console.log("Blob ID:", blobId);
-      console.log("Image Blob ID:", imageBlobId);
+      setLoading(true);
+      const blobData = await store_blob();
+      console.log("Blob ID:", blobData.blob_id);
+      console.log("Image Blob ID:", blobData.image_blob_id);
       await handleCreateGame();
     } catch (err) {
       setError("Failed to mint game. Please try again.");
       console.error("Error:", err);
+    } finally {
+      setLoading(false);
     }
+  };
+  useEffect(() => {
+    if (userDetails) {
+      getBalance(userDetails.address);
+    }
+  }, [userDetails]);
+
+  const toggleWalletInfo = () => {
+    setShowWalletInfo(!showWalletInfo);
+  };
+
+  const handleLogout = () => {
+    logout();
+    setShowWalletInfo(false);
+  };
+
+  const getBalance = async (walletAddress) => {
+    const suiClient = new SuiClient({ url: FULLNODE_URL });
+    const balanceObj = await suiClient.getCoins({
+      owner: walletAddress,
+      limit: 100,
+    });
+
+    const balance = balanceObj.data
+      .filter((coinObj) => coinObj.coinType === "0x2::sui::SUI")
+      .reduce((acc, obj) => acc + parseInt(obj.balance), 0);
+    setUserBalance(balance * 10 ** -9);
   };
 
   const handleCreateGame = async () => {
@@ -161,7 +209,6 @@ export default function Create() {
       return;
     }
 
-    setLoading(true);
     setTxnDigest(null);
     setError(null);
 
@@ -175,11 +222,6 @@ export default function Create() {
       console.log("Package ID:", AI_GAME_GENERATOR_PACKAGE_ID);
 
       const txb = new Transaction();
-
-      // Define the game prompt
-      // const gamePrompt = DEFAULT_GAME_PROMPT;
-
-      // Convert string to Uint8Array using TextEncoder
 
       // Convert strings to `vector<u8>`
       const blobBytes = new TextEncoder().encode(blobId);
@@ -235,6 +277,7 @@ export default function Create() {
       if (txnRes?.digest) {
         console.log("Game creation successful. Digest:", txnRes.digest);
         setTxnDigest(txnRes.digest);
+        setShowMintForm(false); // Hide the form after successful minting
       } else {
         throw new Error("Transaction failed or digest not found in response.");
       }
@@ -245,8 +288,6 @@ export default function Create() {
           ? err.message
           : String(err) ?? "An unknown error occurred.";
       setError(`Failed to create game: ${errorMessage}`);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -259,25 +300,17 @@ export default function Create() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-gray-800 text-white p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <a href="/" className="mr-4">
-              <ArrowLeft size={20} />
-            </a>
-            <h1 className="text-2xl font-bold">Create Your Game</h1>
-          </div>
-          <button className="px-4 py-2 bg-sky-500 rounded-md hover:bg-purple-600 transition">
-            Connect Wallet
-          </button>
-        </div>
-      </header>
-
       <main className="container mx-auto p-4 flex-1">
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
             <AlertCircle size={20} className="mr-2" />
             {error}
+          </div>
+        )}
+
+        {txnDigest && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            <p>Game successfully minted! Transaction digest: {txnDigest}</p>
           </div>
         )}
 
@@ -409,25 +442,78 @@ export default function Create() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-md p-6 text-white">
-              <div className="flex flex-col md:flex-row justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-bold mb-2">
-                    Ready to mint your game?
-                  </h2>
-                  <p className="opacity-80 mb-4 md:mb-0">
-                    Minting will require some SUI tokens as fees. Your game will
-                    be stored on the Sui blockchain.
-                  </p>
+            {!showMintForm ? (
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-md p-6 text-white">
+                <div className="flex flex-col md:flex-row justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-bold mb-2">
+                      Ready to mint your game?
+                    </h2>
+                    <p className="opacity-80 mb-4 md:mb-0">
+                      Minting will require some SUI tokens as fees. Your game will
+                      be stored on the Sui blockchain.
+                    </p>
+                  </div>
+                  <button
+                    className="px-8 py-4 bg-white text-emerald-700 font-bold rounded-lg hover:bg-emerald-50 transition"
+                    onClick={handleShowMintForm}
+                  >
+                    Prepare to Mint
+                  </button>
                 </div>
-                <button
-                  className="px-8 py-4 bg-white text-emerald-700 font-bold rounded-lg hover:bg-emerald-50 transition"
-                  onClick={handleMint}
-                >
-                  Mint This Game
-                </button>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 className="text-xl font-bold mb-4">Mint Your Game</h2>
+                <p className="text-gray-600 mb-4">
+                  Please provide your creator information to mint your game on the Sui blockchain.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Creator Name
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                      placeholder="Enter your creator name"
+                      value={creatorName}
+                      onChange={(e) => setCreatorName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Game Title
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                      placeholder="Enter game title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <button
+                    className="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition"
+                    onClick={() => setShowMintForm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2 disabled:bg-gray-400"
+                    onClick={handleMint}
+                    disabled={loading || !creatorName.trim()}
+                  >
+                    {loading ? "Minting..." : "Mint Game"}
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>

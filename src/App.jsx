@@ -5,8 +5,11 @@ import Create from './Create'
 import GamePage from './Game';
 import MintGame from './MintGame';
 import Retrieve from './temp';
+import Navbar from './navbar';
 function App() {
   return (
+    <div>
+      <Navbar />
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/create" element={<Create />} />
@@ -15,6 +18,7 @@ function App() {
       <Route path="/temp" element={<Retrieve />} />
       {/* Add more routes as needed */}
     </Routes>
+    </div>
   )
 }
 

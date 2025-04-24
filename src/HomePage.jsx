@@ -2,7 +2,6 @@ import { useState, useEffect, use } from 'react';
 import { Search, Plus, ChevronRight, User, LogOut } from 'lucide-react';
 import { useLogin } from './UserContext';
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
-
 const NETWORK = "testnet";
 const FULLNODE_URL = getFullnodeUrl(NETWORK);
 const objectId =
@@ -143,50 +142,6 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-gray-800 text-white p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">SuiPlayground</h1>
-          <div className="flex space-x-4">
-            {isLoggedIn ? (
-              <div className="relative">
-                <button 
-                  onClick={toggleWalletInfo}
-                  className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center hover:bg-sky-600 transition"
-                >
-                  <User size={20} />
-                </button>
-                
-                {showWalletInfo && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white text-gray-800 rounded-lg shadow-lg p-4 z-10">
-                    <div className="mb-3">
-                      <h3 className="font-bold text-gray-700">Wallet Address</h3>
-                      <p className="text-sm break-all">{userDetails.address}</p>
-                    </div>
-                    <div className="mb-4">
-                      <h3 className="font-bold text-gray-700">Balance</h3>
-                      <p className="text-lg font-semibold">{userBalance || '0'} SUI</p>
-                    </div>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition flex items-center justify-center"
-                    >
-                      <LogOut size={16} className="mr-2" /> Logout
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={login}
-                className="px-4 py-2 bg-sky-500 rounded-md hover:bg-purple-600 transition"
-              >
-                Connect Wallet
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
       <main className="container mx-auto p-4 flex-1">
         <div className="flex justify-between items-center mb-8">
           <div className="relative flex-1 max-w-lg">
