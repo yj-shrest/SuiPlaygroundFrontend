@@ -6,6 +6,7 @@ import GamePage from './Game';
 import MintGame from './MintGame';
 import Retrieve from './temp';
 import Navbar from './navbar';
+import Remix from './Remix';
 function App() {
   return (
     <div>
@@ -16,6 +17,7 @@ function App() {
       <Route path="/game/:gameId" element={<GamePage />} />
       <Route path="/mint" element={<MintGame />} />
       <Route path="/temp" element={<Retrieve />} />
+      <Route path="/remix/:gameId" element={<Remix />} />
       {/* Add more routes as needed */}
     </Routes>
     </div>

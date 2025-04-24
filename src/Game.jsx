@@ -89,7 +89,7 @@ export default function GamePage() {
                   
                   <button 
                     className="px-6 py-3 bg-purple-600 text-white rounded-lg flex items-center hover:bg-purple-700 transition"
-                    onClick={handleRemix}
+                    onClick={() => window.location.href = "/remix/"+gameId}
                   >
                     <Repeat size={18} className="mr-2" />
                     Remix
@@ -138,20 +138,7 @@ export default function GamePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-semibold text-gray-700 mb-2">Creator</h3>
-                  <p>{game.creator}</p>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold text-gray-700 mb-2">Created On</h3>
-                  <p>{game.createdAt}</p>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold text-gray-700 mb-2">Minted Status</h3>
-                  <div className="flex items-center">
-                    <div className={`h-2 w-2 rounded-full mr-2 ${game.mintedStatus ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    <span>{game.mintedStatus ? 'Minted on Sui Blockchain' : 'Not Minted'}</span>
-                  </div>
+                  <p>{game.creator_name}</p>
                 </div>
                 
                 <div>

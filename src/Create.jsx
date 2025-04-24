@@ -163,7 +163,7 @@ export default function Create() {
       const blobData = await store_blob();
       console.log("Blob ID:", blobData.blob_id);
       console.log("Image Blob ID:", blobData.image_blob_id);
-      await handleCreateGame();
+      await handleCreateGame(blobData.blob_id, blobData.image_blob_id);
     } catch (err) {
       setError("Failed to mint game. Please try again.");
       console.error("Error:", err);
@@ -199,7 +199,7 @@ export default function Create() {
     setUserBalance(balance * 10 ** -9);
   };
 
-  const handleCreateGame = async () => {
+  const handleCreateGame = async (blob_id,image_blob_id) => {
     if (!userDetails) {
       setError("Please log in first.");
       return;
@@ -224,8 +224,8 @@ export default function Create() {
       const txb = new Transaction();
 
       // Convert strings to `vector<u8>`
-      const blobBytes = new TextEncoder().encode(blobId);
-      const imageBlobBytes = new TextEncoder().encode(imageBlobId);
+      const blobBytes = new TextEncoder().encode(blob_id);
+      const imageBlobBytes = new TextEncoder().encode(image_blob_id);
 
       // Encode each one using BCS
       const blobBytesBCS = bcs
@@ -406,7 +406,7 @@ export default function Create() {
         {gameHtml && (
           <>
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-xl font-bold mb-4">Your Game</h2>
+              <h2 className="text-xl font-bold mb-4">{gameConfig.title}</h2>
 
               <div className="border border-gray-300 rounded-lg mb-6 overflow-hidden">
                 <iframe

@@ -64,7 +64,7 @@ export default function HomePage() {
           })
         );
         const filteredGames = gameObjects.filter((game) => {
-          return game.image_blob_id.length > 20 && game.game_id >1;});
+          return game.image_blob_id.length > 20 && game.game_id >3;});
         console.log(filteredGames);
         localStorage.setItem("games", JSON.stringify(filteredGames));
         setGames(filteredGames);
@@ -154,7 +154,7 @@ export default function HomePage() {
             />
             <Search className="absolute left-3 top-3 text-gray-400" size={20} />
           </div>
-          <button className="ml-4 px-6 py-3 bg-blue-500 text-white rounded-lg flex items-center hover:bg-green-600 transition">
+          <button onClick={() => window.location.href = "/create"} className="ml-4 px-6 py-3 bg-blue-500 text-white rounded-lg flex items-center hover:bg-green-600 transition">
             <Plus size={20} className="mr-2" /> Create
           </button>
         </div>
